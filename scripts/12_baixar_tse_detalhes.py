@@ -23,6 +23,18 @@ Instagram etc.) nem risco de linkar a pessoa errada.
 Gera:
   data/processed/detalhes_tse_pi.csv
 
+POR QUE PLAYWRIGHT EM VEZ DE REQUESTS: a primeira versao deste script
+usava `requests` puro e voltava 0 resultado pra todo mundo, sem erro
+HTTP normal - a resposta era uma pagina de bloqueio da Akamai (a
+protecao anti-bot que fica na frente do dominio divulgacandcontas.tse.jus.br),
+confirmado testando manualmente (`errors.edgesuite.net` na resposta).
+Um navegador de verdade (Playwright/Chromium) passa por essa protecao
+normalmente - foi assim que a API foi descoberta e testada em primeiro
+lugar, inspecionando o trafego de rede da pagina real. Aqui abrimos UM
+navegador e reusamos a mesma pagina pra todas as 348 chamadas (via
+`fetch` executado dentro da pagina, com `page.evaluate`), em vez de
+abrir/fechar navegador a cada candidato.
+
 FONTE (confirmada contra a API real em set/2026, inspecionando o
 trafego de rede da propria pagina do TSE - nao adivinhada):
   - Dados pessoais:
@@ -38,55 +50,80 @@ inicio da campanha) - nesse caso a chamada de prestador falha ou volta
 vazia, e so' deixamos os campos de prestacao de contas em branco pra
 aquele candidato (nao e' erro).
 
+REQUISITO: playwright instalado (ja no requirements.txt) e o browser do
+Playwright baixado uma vez com:
+    playwright install chromium
+
 Uso:
     python scripts/12_baixar_tse_detalhes.py
 """
 from __future__ import annotations
 
 import sys
-import time
 from pathlib import Path
 
 import pandas as pd
-import requests
+from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts import config  # noqa: E402
 
-HEADERS = {"User-Agent": config.USER_AGENT, "Accept": "application/json"}
-TIMEOUT = 30
-PAUSA = 0.3
-
-
-def _get_json(url: str) -> dict | None:
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
-    except requests.RequestException:
-        return None
-    if resp.status_code != 200:
-        return None
-    try:
-        return resp.json()
-    except ValueError:
-        return None
+SITE_BASE = "https://divulgacandcontas.tse.jus.br"
 
 
 def _url_divulga(uf: str, sq_candidato: str, ano_eleicao: str) -> str:
     """Monta o link publico (pagina, nao API) da candidatura no TSE, pra
     o usuario final poder abrir e ver tudo em detalhe se quiser."""
     return (
-        f"https://divulgacandcontas.tse.jus.br/divulga/#/candidato/"
+        f"{SITE_BASE}/divulga/#/candidato/"
         f"NORDESTE/{uf}/{config.TSE_ID_ELEICAO_PI}/{sq_candidato}/{ano_eleicao}/{uf}"
     )
 
 
-def buscar_detalhe_candidato(sq_candidato: str, ano_eleicao: str, cargo: str) -> dict:
-    base = config.DIVULGACANDCONTAS_API_BASE
-    uf = config.UF
+# JS executado DENTRO da pagina (via page.evaluate) - faz as duas
+# chamadas fetch (candidatura e, se der, prestacao de contas) e devolve
+# tudo junto num objeto so, pra minimizar o numero de idas e vindas
+# entre Python e o navegador.
+JS_BUSCAR_CANDIDATO = """
+async ({ base, idEleicao, uf, ano, sqCandidato, codigoCargo }) => {
+  const resultado = { candidatura: null, prestador: null, erro: null };
+  try {
+    const rCand = await fetch(
+      `${base}/divulga/rest/v1/candidatura/buscar/${ano}/${uf}/${idEleicao}/candidato/${sqCandidato}`,
+      { headers: { Accept: "application/json" } }
+    );
+    if (rCand.ok) {
+      resultado.candidatura = await rCand.json();
+    }
+  } catch (e) {
+    resultado.erro = "candidatura: " + String(e);
+    return resultado;
+  }
 
-    candidatura = _get_json(
-        f"{base}/candidatura/buscar/{ano_eleicao}/{uf}/{config.TSE_ID_ELEICAO_PI}/candidato/{sq_candidato}"
-    )
+  const candidatura = resultado.candidatura;
+  const nrPartido = candidatura && candidatura.partido ? candidatura.partido.numero : null;
+  const numero = candidatura ? candidatura.numero : null;
+
+  if (codigoCargo && nrPartido && numero) {
+    try {
+      const rPrest = await fetch(
+        `${base}/divulga/rest/v1/prestador/consulta/${idEleicao}/${ano}/${uf}/${codigoCargo}/${nrPartido}/${numero}/${sqCandidato}`,
+        { headers: { Accept: "application/json" } }
+      );
+      if (rPrest.ok) {
+        resultado.prestador = await rPrest.json();
+      }
+    } catch (e) {
+      resultado.erro = "prestador: " + String(e);
+    }
+  }
+
+  return resultado;
+}
+"""
+
+
+def montar_linha(sq_candidato: str, ano_eleicao: str, uf: str, resultado: dict) -> dict:
     linha = {
         "sq_candidato": sq_candidato,
         "grau_instrucao": "",
@@ -104,37 +141,27 @@ def buscar_detalhe_candidato(sq_candidato: str, ano_eleicao: str, cargo: str) ->
         "tse_divulga_url": _url_divulga(uf, sq_candidato, ano_eleicao),
     }
 
-    if not candidatura:
-        return linha
+    candidatura = resultado.get("candidatura")
+    if candidatura:
+        linha["grau_instrucao"] = candidatura.get("grauInstrucao") or ""
+        linha["ocupacao"] = candidatura.get("ocupacao") or ""
+        linha["estado_civil"] = candidatura.get("descricaoEstadoCivil") or ""
+        linha["cor_raca"] = candidatura.get("descricaoCorRaca") or ""
+        linha["data_nascimento"] = candidatura.get("dataDeNascimento") or ""
+        if candidatura.get("fotoUrlPublicavel"):
+            linha["foto_url"] = candidatura.get("fotoUrl") or ""
+        sites = candidatura.get("sites") or []
+        linha["sites_tse"] = " | ".join(s for s in sites if s)
+        linha["bens_total"] = candidatura.get("totalDeBens") or ""
 
-    linha["grau_instrucao"] = candidatura.get("grauInstrucao") or ""
-    linha["ocupacao"] = candidatura.get("ocupacao") or ""
-    linha["estado_civil"] = candidatura.get("descricaoEstadoCivil") or ""
-    linha["cor_raca"] = candidatura.get("descricaoCorRaca") or ""
-    linha["data_nascimento"] = candidatura.get("dataDeNascimento") or ""
-    if candidatura.get("fotoUrlPublicavel"):
-        linha["foto_url"] = candidatura.get("fotoUrl") or ""
-    sites = candidatura.get("sites") or []
-    linha["sites_tse"] = " | ".join(s for s in sites if s)
-    linha["bens_total"] = candidatura.get("totalDeBens") or ""
-
-    codigo_cargo = config.TSE_CODIGO_CARGO.get(cargo)
-    partido = candidatura.get("partido") or {}
-    nr_partido = partido.get("numero")
-    numero = candidatura.get("numero")
-
-    if codigo_cargo and nr_partido and numero:
-        prestador = _get_json(
-            f"{base}/prestador/consulta/{config.TSE_ID_ELEICAO_PI}/{ano_eleicao}/{uf}/"
-            f"{codigo_cargo}/{nr_partido}/{numero}/{sq_candidato}"
-        )
-        if prestador:
-            consolidados = prestador.get("dadosConsolidados") or {}
-            despesas = prestador.get("despesas") or {}
-            linha["prestacao_total_recebido"] = consolidados.get("totalRecebido") or ""
-            linha["prestacao_total_despesas_contratadas"] = despesas.get("totalDespesasContratadas") or ""
-            linha["prestacao_total_despesas_pagas"] = despesas.get("totalDespesasPagas") or ""
-            linha["prestacao_data_atualizacao"] = prestador.get("dataUltimaAtualizacaoContas") or ""
+    prestador = resultado.get("prestador")
+    if prestador:
+        consolidados = prestador.get("dadosConsolidados") or {}
+        despesas = prestador.get("despesas") or {}
+        linha["prestacao_total_recebido"] = consolidados.get("totalRecebido") or ""
+        linha["prestacao_total_despesas_contratadas"] = despesas.get("totalDespesasContratadas") or ""
+        linha["prestacao_total_despesas_pagas"] = despesas.get("totalDespesasPagas") or ""
+        linha["prestacao_data_atualizacao"] = prestador.get("dataUltimaAtualizacaoContas") or ""
 
     return linha
 
@@ -148,29 +175,64 @@ def main() -> None:
 
     candidatos = pd.read_csv(caminho_candidatos, dtype=str).fillna("")
     total = len(candidatos)
-    print(f"Buscando detalhes complementares do TSE para {total} candidato(s)...")
+    print(f"Buscando detalhes complementares do TSE para {total} candidato(s) (via navegador)...")
 
     linhas = []
-    for i, row in enumerate(candidatos.to_dict("records"), start=1):
-        sq = row.get("sq_candidato", "")
-        cargo = row.get("cargo", "")
-        ano = row.get("ano_eleicao") or str(config.ANO_ELEICAO)
-        if not sq:
-            continue
+    erros = 0
 
-        linhas.append(buscar_detalhe_candidato(sq, ano, cargo))
+    with sync_playwright() as p:
+        navegador = p.chromium.launch(headless=True)
+        page = navegador.new_page()
+        # Carrega a pagina uma vez so, pra abrir na mesma origem do site
+        # (fetch de dentro da pagina evita qualquer questao de CORS e
+        # passa pela protecao anti-bot igual um acesso humano normal).
+        page.goto(f"{SITE_BASE}/divulga/", timeout=60000)
+        page.wait_for_timeout(1500)
 
-        if i % 25 == 0 or i == total:
-            print(f"  {i}/{total} processado(s)...")
-        time.sleep(PAUSA)
+        for i, row in enumerate(candidatos.to_dict("records"), start=1):
+            sq = row.get("sq_candidato", "")
+            cargo = row.get("cargo", "")
+            ano = row.get("ano_eleicao") or str(config.ANO_ELEICAO)
+            uf = row.get("uf") or config.UF
+            if not sq:
+                continue
+
+            codigo_cargo = config.TSE_CODIGO_CARGO.get(cargo)
+
+            try:
+                resultado = page.evaluate(
+                    JS_BUSCAR_CANDIDATO,
+                    {
+                        "base": SITE_BASE,
+                        "idEleicao": config.TSE_ID_ELEICAO_PI,
+                        "uf": uf,
+                        "ano": ano,
+                        "sqCandidato": sq,
+                        "codigoCargo": codigo_cargo,
+                    },
+                )
+            except Exception as exc:
+                print(f"  (aviso) falha no candidato {sq}: {exc}")
+                resultado = {}
+                erros += 1
+
+            linhas.append(montar_linha(sq, ano, uf, resultado))
+            page.wait_for_timeout(150)  # pausa curta entre chamadas, por educacao com o servidor
+
+            if i % 25 == 0 or i == total:
+                print(f"  {i}/{total} processado(s)...")
+
+        navegador.close()
 
     df = pd.DataFrame(linhas)
     df.to_csv(config.PROCESSED_DIR / "detalhes_tse_pi.csv", index=False)
 
     com_prestacao = (df["prestacao_total_recebido"] != "").sum()
     com_sites = (df["sites_tse"] != "").sum()
+    com_dados_pessoais = (df["grau_instrucao"] != "").sum()
     print("\nPronto!")
-    print(f"Detalhes baixados: {len(df)}/{total}")
+    print(f"Detalhes baixados: {len(df)}/{total} (falhas de chamada: {erros})")
+    print(f"Com dados pessoais (grau de instrucao etc.): {com_dados_pessoais}")
     print(f"Com prestacao de contas ja entregue: {com_prestacao}")
     print(f"Com site/rede social informado ao TSE: {com_sites}")
 
