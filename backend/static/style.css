@@ -113,6 +113,10 @@ main {
   gap: 10px;
 }
 
+.resultados[hidden] {
+  display: none;
+}
+
 .cartao-candidato {
   display: flex;
   justify-content: space-between;
