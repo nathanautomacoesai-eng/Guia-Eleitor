@@ -126,7 +126,7 @@ main {
 }
 
 @media (prefers-color-scheme: dark) {
-  .cartao-candidato, .bloco { background: #1a1e25; }
+  .cartao-candidato { background: #1a1e25; }
 }
 
 .cartao-candidato:hover {
@@ -161,6 +161,10 @@ main {
   border-radius: 10px;
   padding: 16px;
   margin-bottom: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bloco { background: #1a1e25; }
 }
 
 .bloco h2 {
