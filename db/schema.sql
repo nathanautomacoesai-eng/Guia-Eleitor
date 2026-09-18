@@ -2,6 +2,7 @@
 -- Rodado do zero a cada execucao do scripts/07_montar_banco.py (DROP + CREATE),
 -- entao nao guarde nada manualmente direto nessas tabelas - sera apagado.
 
+DROP TABLE IF EXISTS emendas_estaduais CASCADE;
 DROP TABLE IF EXISTS gestao_convenios CASCADE;
 DROP TABLE IF EXISTS gestao_licitacoes CASCADE;
 DROP TABLE IF EXISTS gestao_contratos CASCADE;
@@ -168,3 +169,21 @@ CREATE TABLE gestao_convenios (
     tipo_termo TEXT
 );
 CREATE INDEX idx_gestao_convenios_parlamentar ON gestao_convenios (parlamentar_id);
+
+
+-- --- Emendas parlamentares ESTADUAIS (Deputado Estadual em exercicio,
+-- via ALEPI + Portal da Transparencia do Piaui) - analogo a tabela
+-- "emendas" (que e' so de emenda parlamentar FEDERAL/CGU) ---
+CREATE TABLE emendas_estaduais (
+    id SERIAL PRIMARY KEY,
+    parlamentar_id TEXT,
+    ano INTEGER,
+    emenda_numero TEXT,
+    status TEXT,
+    modalidade TEXT,
+    beneficiario_nome TEXT,
+    localidade_beneficiada TEXT,
+    objetivo_titulo TEXT,
+    valor NUMERIC
+);
+CREATE INDEX idx_emendas_estaduais_parlamentar ON emendas_estaduais (parlamentar_id);

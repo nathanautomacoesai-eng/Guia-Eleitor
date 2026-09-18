@@ -26,6 +26,7 @@ em publicar o site na internet (não só rodar localmente).
 | Emendas parlamentares (federal) | [Portal da Transparência (CGU)](https://portaldatransparencia.gov.br/api-de-dados) | **Experimental**, ver Limitações |
 | Vereadores de Teresina em exercício, despesas, emendas | [Portal da Transparência da Câmara Municipal de Teresina](https://transparencia.teresina.pi.leg.br) | Alta (site oficial, sem API - coletado via automação de navegador) |
 | Governador titular: despesas, receitas, contratos, licitações, convênios | [Portal da Transparência do Piauí](https://transparencia.pi.gov.br) (API em `api.transparencia.pi.gov.br`, não documentada publicamente) | Alta (dado oficial do Executivo estadual) · ver "Ficha de gestão do Governador" |
+| Deputados estaduais em exercício (ALEPI) e suas emendas parlamentares estaduais | [Assembleia Legislativa do Piauí](https://sapl.al.pi.leg.br) (API do sistema SAPL) + [Portal da Transparência do Piauí](https://transparencia.pi.gov.br) (`/api/v1/emendas-estaduais/{ano}/`) | Alta (dado oficial), vínculo por nome (ALEPI não expõe CPF) |
 
 ## Estrutura do projeto
 
@@ -43,6 +44,7 @@ Guia Eleitor/
     08_baixar_camara_teresina.py  # vereadores de Teresina: despesas + emendas (automação de navegador, sem API)
     09_diagnostico_transparencia_pi.py  # script de diagnóstico da API do Piauí (não faz parte da pipeline)
     10_baixar_transparencia_pi.py  # ficha de gestão do Governador titular (despesas/receitas/contratos/licitações/convênios)
+    11_baixar_alepi.py       # deputados estaduais em exercício (ALEPI) + emendas parlamentares estaduais
     executar_tudo.py         # roda os passos em sequência
     db.py                    # conexão com o Postgres, compartilhada por scripts e backend
     storage.py               # upload de PDFs pro Supabase Storage (API REST)
@@ -199,12 +201,16 @@ algum passo vier vazio ou der erro.
 
 ## Limitações conhecidas
 
-- **Deputado Estadual (ALEPI):** não existe uma API nacional padronizada
-  para emendas/projetos de deputados estaduais como existe para os
-  federais. Por enquanto, candidatos a Deputado Estadual só mostram a
-  proposta de governo do TSE, sem "ficha de gestor". Dá para evoluir isso
-  raspando o portal de transparência da própria Assembleia Legislativa do
-  PI, se fizer sentido depois.
+- **Deputado Estadual (ALEPI):** desde a inclusão de `11_baixar_alepi.py`,
+  deputados estaduais em exercício aparecem como "já tem mandato" e
+  mostram as emendas parlamentares estaduais deles (fonte: Portal da
+  Transparência do Piauí). Diferente da ficha de deputado federal, não
+  há dados de despesas de gabinete nem de projetos apresentados: a ALEPI
+  não tem uma API pública equivalente à da Câmara dos Deputados para
+  isso. A API do SAPL (usada para a lista de deputados) também não expõe
+  CPF, então o vínculo candidato-deputado e emenda-deputado é sempre por
+  nome (ver "Vínculo por nome" abaixo) - nunca por CPF, diferente do que
+  acontece com federais/senadores quando o CPF bate.
 - **Vínculo por nome (quando não há CPF batendo):** é marcado no site como
   confiança "média" e mostra um aviso: em nomes muito comuns, pode
   raramente associar à pessoa errada. Vale conferir manualmente em casos
@@ -214,14 +220,6 @@ algum passo vier vazio ou der erro.
 - **Neutralidade:** o site só reproduz dados oficiais com a fonte indicada,
   sem ranking, nota ou opinião; importante para não esbarrar em regras do
   TSE sobre propaganda eleitoral.
-- **Emendas parlamentares estaduais:** o Portal da Transparência do Piauí
-  também expõe emendas de deputados estaduais à ALEPI
-  (`/api/v1/emendas-estaduais/{ano}/`, com nome do parlamentar, valor,
-  status e beneficiário). Isso resolveria parcialmente a limitação de
-  Deputado Estadual acima, mas ainda não foi implementado (precisaria de
-  um vínculo por nome parecido com o feito para os vereadores de
-  Teresina). Fica como próximo passo, se fizer sentido.
-
 ## Ajustando o recorte
 
 Para incluir outro estado ou outros cargos, edite `scripts/config.py`

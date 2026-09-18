@@ -115,6 +115,7 @@ def detalhar_candidato(sq_candidato: str) -> dict | None:
         candidato["gestao_contratos"] = []
         candidato["gestao_licitacoes"] = []
         candidato["gestao_convenios"] = []
+        candidato["emendas_estaduais"] = []
 
         if candidato.get("incumbente") and pid:
             candidato["despesas"] = _consulta_opcional(conn, "despesas", pid, "ano DESC, mes DESC")
@@ -131,6 +132,13 @@ def detalhar_candidato(sq_candidato: str) -> dict | None:
                 candidato["gestao_contratos"] = _consulta_opcional(conn, "gestao_contratos", pid, "ano DESC, valor_contratado DESC")
                 candidato["gestao_licitacoes"] = _consulta_opcional(conn, "gestao_licitacoes", pid, "ano DESC, valor_total_previsto DESC")
                 candidato["gestao_convenios"] = _consulta_opcional(conn, "gestao_convenios", pid, "ano DESC, valor_total DESC")
+
+            # Emendas parlamentares ESTADUAIS (Deputado Estadual em
+            # exercicio pela ALEPI) - fonte propria (Portal da
+            # Transparencia do Piaui), diferente das emendas FEDERAIS
+            # (tabela "emendas", CGU). Ver scripts/11_baixar_alepi.py.
+            if candidato.get("parlamentar_origem") == "alepi":
+                candidato["emendas_estaduais"] = _consulta_opcional(conn, "emendas_estaduais", pid, "ano DESC, valor DESC")
         else:
             candidato["despesas"] = []
             candidato["proposicoes"] = []

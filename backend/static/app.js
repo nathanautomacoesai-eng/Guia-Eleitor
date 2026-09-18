@@ -174,24 +174,34 @@ function renderizarDetalhe(c) {
       : "";
 
     const ehGovernadorAtual = c.cargo === "GOVERNADOR" && c.parlamentar_origem === "executivo_estadual";
+    const ehDeputadoEstadualAtual = c.cargo === "DEPUTADO ESTADUAL" && c.parlamentar_origem === "alepi";
+
+    let tituloFicha = "Ficha como gestor(a) / parlamentar em exercício";
+    let conteudoFicha = [
+      renderizarEmendas(c.emendas || []),
+      renderizarProposicoes(c.proposicoes || []),
+      renderizarDespesas(c.despesas || []),
+    ].join("\n");
+
+    if (ehGovernadorAtual) {
+      tituloFicha = "Ficha de gestão (Governador titular)";
+      conteudoFicha = [
+        renderizarGestaoDespesas(c.gestao_despesas || []),
+        renderizarGestaoReceitas(c.gestao_receitas || []),
+        renderizarGestaoContratos(c.gestao_contratos || []),
+        renderizarGestaoLicitacoes(c.gestao_licitacoes || []),
+        renderizarGestaoConvenios(c.gestao_convenios || []),
+      ].join("\n");
+    } else if (ehDeputadoEstadualAtual) {
+      tituloFicha = "Ficha como deputado(a) estadual em exercício";
+      conteudoFicha = renderizarEmendasEstaduais(c.emendas_estaduais || []);
+    }
 
     partes.push(`
       <div class="bloco">
-        <h2>${ehGovernadorAtual ? "Ficha de gestão (Governador titular)" : "Ficha como gestor(a) / parlamentar em exercício"}</h2>
+        <h2>${tituloFicha}</h2>
         ${avisoConfianca}
-        ${ehGovernadorAtual
-          ? [
-              renderizarGestaoDespesas(c.gestao_despesas || []),
-              renderizarGestaoReceitas(c.gestao_receitas || []),
-              renderizarGestaoContratos(c.gestao_contratos || []),
-              renderizarGestaoLicitacoes(c.gestao_licitacoes || []),
-              renderizarGestaoConvenios(c.gestao_convenios || []),
-            ].join("\n")
-          : [
-              renderizarEmendas(c.emendas || []),
-              renderizarProposicoes(c.proposicoes || []),
-              renderizarDespesas(c.despesas || []),
-            ].join("\n")}
+        ${conteudoFicha}
       </div>
     `);
   }
@@ -367,6 +377,30 @@ function renderizarGestaoConvenios(linhas) {
       <tbody>${corpo}</tbody>
     </table>
     <p class="fonte">Fonte: Portal da Transparência do Piauí.</p>
+  `;
+}
+
+function renderizarEmendasEstaduais(linhas) {
+  if (linhas.length === 0) {
+    return "<h3>Emendas parlamentares estaduais</h3><p class='meta'>Nenhuma emenda encontrada no período consultado.</p>";
+  }
+  const corpo = linhas.map((e) => `
+    <tr>
+      <td>${e.ano || "-"}</td>
+      <td>${e.status || "-"}</td>
+      <td>${e.modalidade || "-"}</td>
+      <td>${truncar(e.beneficiario_nome, 100)}</td>
+      <td>${e.localidade_beneficiada || "-"}</td>
+      <td>${formatarMoeda(e.valor)}</td>
+    </tr>
+  `).join("");
+  return `
+    <h3>Emendas parlamentares estaduais</h3>
+    <table class="tabela-simples">
+      <thead><tr><th>Ano</th><th>Status</th><th>Modalidade</th><th>Beneficiário</th><th>Localidade</th><th>Valor</th></tr></thead>
+      <tbody>${corpo}</tbody>
+    </table>
+    <p class="fonte">Fonte: Portal da Transparência do Piauí / Assembleia Legislativa do Piauí (ALEPI).</p>
   `;
 }
 

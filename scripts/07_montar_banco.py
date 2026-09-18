@@ -135,6 +135,7 @@ def montar_parlamentares() -> pd.DataFrame:
         carregar_csv_opcional("parlamentares_senado_pi.csv"),
         carregar_csv_opcional("parlamentares_camara_teresina_pi.csv"),
         carregar_csv_opcional("parlamentares_executivo_pi.csv"),
+        carregar_csv_opcional("parlamentares_alepi_pi.csv"),
     ]
     partes = [p for p in partes if not p.empty]
     if not partes:
@@ -294,6 +295,10 @@ COLUNAS_GESTAO_CONVENIOS = [
     "parlamentar_id", "ano", "numero_ano", "nome_proponente", "nome_concedente",
     "valor_total", "objeto", "situacao", "tipo_termo",
 ]
+COLUNAS_EMENDAS_ESTADUAIS = [
+    "parlamentar_id", "ano", "emenda_numero", "status", "modalidade",
+    "beneficiario_nome", "localidade_beneficiada", "objetivo_titulo", "valor",
+]
 
 
 def _linha_candidato_para_tupla(row: dict) -> tuple:
@@ -407,6 +412,20 @@ def _linha_gestao_convenio_para_tupla(row: dict) -> tuple:
     )
 
 
+def _linha_emenda_estadual_para_tupla(row: dict) -> tuple:
+    return (
+        _vazio_para_none(row.get("parlamentar_id", "")),
+        _para_inteiro(row.get("ano", "")),
+        _vazio_para_none(row.get("emenda_numero", "")),
+        _vazio_para_none(row.get("status", "")),
+        _vazio_para_none(row.get("modalidade", "")),
+        _vazio_para_none(row.get("beneficiario_nome", "")),
+        _vazio_para_none(row.get("localidade_beneficiada", "")),
+        _vazio_para_none(row.get("objetivo_titulo", "")),
+        _para_numero(row.get("valor", "")),
+    )
+
+
 def montar_banco(
     candidatos: pd.DataFrame,
     parlamentares: pd.DataFrame,
@@ -418,6 +437,7 @@ def montar_banco(
     gestao_contratos: pd.DataFrame,
     gestao_licitacoes: pd.DataFrame,
     gestao_convenios: pd.DataFrame,
+    emendas_estaduais: pd.DataFrame,
 ) -> None:
     conn = db.get_connection()
     try:
@@ -517,6 +537,15 @@ def montar_banco(
                 )
                 print(f"Inseridos {len(tuplas)} convenio(s)/parceria(s) de gestao.")
 
+            if not emendas_estaduais.empty:
+                tuplas = [_linha_emenda_estadual_para_tupla(r) for r in emendas_estaduais.to_dict("records")]
+                execute_values(
+                    cur,
+                    f"INSERT INTO emendas_estaduais ({', '.join(COLUNAS_EMENDAS_ESTADUAIS)}) VALUES %s",
+                    tuplas,
+                )
+                print(f"Inseridas {len(tuplas)} emenda(s) estadual(is).")
+
         conn.commit()
     finally:
         conn.close()
@@ -547,6 +576,7 @@ def main() -> None:
     gestao_contratos = carregar_csv_opcional("gestao_contratos_pi.csv")
     gestao_licitacoes = carregar_csv_opcional("gestao_licitacoes_pi.csv")
     gestao_convenios = carregar_csv_opcional("gestao_convenios_pi.csv")
+    emendas_estaduais = carregar_csv_opcional("emendas_estaduais_pi.csv")
 
     candidatos = vincular_candidatos_a_parlamentares(candidatos, parlamentares)
     montar_banco(
@@ -554,6 +584,7 @@ def main() -> None:
         parlamentares.drop(columns=["nome_normalizado"], errors="ignore"),
         despesas, proposicoes, emendas,
         gestao_despesas, gestao_receitas, gestao_contratos, gestao_licitacoes, gestao_convenios,
+        emendas_estaduais,
     )
 
     print("\nPronto! Banco Postgres (Supabase) atualizado.")

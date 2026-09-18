@@ -116,3 +116,15 @@ GOVERNADOR_ATUAL_PARTIDO = "PT"
 # Anos do mandato atual a varrer na ingestao (2023 = inicio do mandato,
 # ate o ano corrente da eleicao). Ajuste se o mandato mudar.
 TRANSPARENCIA_PI_ANOS = [2023, 2024, 2025, 2026]
+
+# --- Assembleia Legislativa do Piaui (ALEPI) ---
+# API publica do sistema SAPL (usado por varias casas legislativas
+# brasileiras) que a propria ALEPI usa no site dela. Confirmada via
+# chamada direta em set/2026: https://sapl.al.pi.leg.br/api/parlamentares/parlamentar/
+# Devolve TODOS os parlamentares do historico (paginado); filtramos pelo
+# campo "ativo" == true para pegar so quem esta no mandato atual. Nao
+# expoe CPF, entao o vinculo com candidatos usa so' comparacao de nome
+# (mesmo mecanismo ja usado pra deputado federal/senador quando o CPF
+# nao bate).
+SAPL_ALEPI_API_BASE = "https://sapl.al.pi.leg.br/api"
+

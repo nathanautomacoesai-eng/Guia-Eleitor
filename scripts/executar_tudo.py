@@ -31,6 +31,7 @@ PASSOS_MELHOR_ESFORCO = [
     "06_baixar_transparencia.py",
     "08_baixar_camara_teresina.py",
     "10_baixar_transparencia_pi.py",
+    "11_baixar_alepi.py",
 ]
 PASSO_FINAL = "07_montar_banco.py"
 
