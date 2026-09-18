@@ -129,6 +129,41 @@ def aplicar_links_externos(candidatos: pd.DataFrame, links: pd.DataFrame) -> pd.
     return candidatos
 
 
+COLUNAS_DETALHES_TSE = [
+    "grau_instrucao", "ocupacao", "estado_civil", "cor_raca",
+    "data_nascimento", "foto_url", "sites_tse", "bens_total",
+    "prestacao_total_recebido", "prestacao_total_despesas_contratadas",
+    "prestacao_total_despesas_pagas", "prestacao_data_atualizacao",
+    "tse_divulga_url",
+]
+
+
+def aplicar_detalhes_tse(candidatos: pd.DataFrame, detalhes: pd.DataFrame) -> pd.DataFrame:
+    """Junta os dados complementares do TSE (scripts/12_baixar_tse_detalhes.py)
+    aos candidatos, casando por sq_candidato. Assim como os links
+    externos, e' um LEFT JOIN - candidato sem linha em detalhes_tse_pi.csv
+    (script nao rodado, ou candidato sem dado disponivel) so' fica com
+    esses campos em branco, sem quebrar o resto da carga."""
+    candidatos = candidatos.copy()
+    for col in COLUNAS_DETALHES_TSE:
+        candidatos[col] = ""
+
+    if detalhes.empty:
+        return candidatos
+
+    detalhes_por_sq = detalhes.set_index("sq_candidato")
+    encontrados = 0
+    for idx, candidato in candidatos.iterrows():
+        sq = str(candidato.get("sq_candidato", ""))
+        if sq in detalhes_por_sq.index:
+            for col in COLUNAS_DETALHES_TSE:
+                candidatos.at[idx, col] = detalhes_por_sq.at[sq, col]
+            encontrados += 1
+    if encontrados:
+        print(f"Detalhes complementares do TSE aplicados: {encontrados}/{len(detalhes)}.")
+    return candidatos
+
+
 def montar_parlamentares() -> pd.DataFrame:
     partes = [
         carregar_csv_opcional("parlamentares_camara_pi.csv"),
@@ -270,6 +305,11 @@ COLUNAS_CANDIDATOS = [
     "proposta_texto_arquivo", "proposta_resumo", "parlamentar_id",
     "parlamentar_origem", "incumbente", "vinculo_confianca",
     "link_externo_url", "link_externo_rotulo",
+    "grau_instrucao", "ocupacao", "estado_civil", "cor_raca",
+    "data_nascimento", "foto_url", "sites_tse", "bens_total",
+    "prestacao_total_recebido", "prestacao_total_despesas_contratadas",
+    "prestacao_total_despesas_pagas", "prestacao_data_atualizacao",
+    "tse_divulga_url",
 ]
 
 COLUNAS_PARLAMENTARES = [
@@ -301,12 +341,20 @@ COLUNAS_EMENDAS_ESTADUAIS = [
 ]
 
 
+COLUNAS_CANDIDATOS_NUMERICAS = {
+    "bens_total", "prestacao_total_recebido",
+    "prestacao_total_despesas_contratadas", "prestacao_total_despesas_pagas",
+}
+
+
 def _linha_candidato_para_tupla(row: dict) -> tuple:
     valores = []
     for col in COLUNAS_CANDIDATOS:
         val = row.get(col, "")
         if col == "incumbente":
             valores.append(_para_bool(val))
+        elif col in COLUNAS_CANDIDATOS_NUMERICAS:
+            valores.append(_para_numero(val))
         else:
             valores.append(_vazio_para_none(val))
     return tuple(valores)
@@ -559,6 +607,7 @@ def main() -> None:
         raise SystemExit(1)
 
     candidatos = aplicar_links_externos(candidatos, carregar_links_externos())
+    candidatos = aplicar_detalhes_tse(candidatos, carregar_csv_opcional("detalhes_tse_pi.csv"))
 
     parlamentares = montar_parlamentares()
     despesas = pd.concat(

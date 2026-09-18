@@ -117,6 +117,38 @@ GOVERNADOR_ATUAL_PARTIDO = "PT"
 # ate o ano corrente da eleicao). Ajuste se o mandato mudar.
 TRANSPARENCIA_PI_ANOS = [2023, 2024, 2025, 2026]
 
+# --- TSE - DivulgaCandContas (API oficial por tras da pagina publica de
+# "Divulgacao de Candidaturas e Contas Eleitorais",
+# https://divulgacandcontas.tse.jus.br/divulga/) ---
+# Achada inspecionando o trafego de rede da propria pagina do TSE (nao e'
+# documentada publicamente, mas e' a mesma API que qualquer pessoa usa
+# ao abrir a pagina de um candidato no site do TSE). Da' acesso, por
+# candidato, a dados pessoais (grau de instrucao, ocupacao, estado civil,
+# foto, bens declarados, sites/redes sociais que o proprio candidato
+# informou) e ao resumo da prestacao de contas de campanha (total
+# arrecadado, total gasto, maiores doadores/fornecedores).
+DIVULGACANDCONTAS_API_BASE = "https://divulgacandcontas.tse.jus.br/divulga/rest/v1"
+
+# Identificador da eleicao usado pela API do TSE acima. CONFIRMADO
+# identico para candidatos de cargos diferentes (Deputado Federal,
+# Deputado Estadual, Governador) do PI em 2026 via chamada direta a
+# API - e' um id por eleicao/UF, nao por candidato ou cargo. Se um dia
+# a comparacao neste projeto passar a incluir 2º turno de Governador ou
+# outra eleicao, verifique se esse id muda.
+TSE_ID_ELEICAO_PI = "20322002026"
+
+# Codigo interno do TSE para cada cargo, usado para montar a URL da
+# prestacao de contas (endpoint /prestador/consulta/.../{codigoCargo}/...).
+# Confirmado contra a API real pra cada um dos 4 cargos do recorte deste
+# projeto.
+TSE_CODIGO_CARGO = {
+    "GOVERNADOR": 3,
+    "SENADOR": 5,
+    "DEPUTADO FEDERAL": 6,
+    "DEPUTADO ESTADUAL": 7,
+}
+
+
 # --- Assembleia Legislativa do Piaui (ALEPI) ---
 # API publica do sistema SAPL (usado por varias casas legislativas
 # brasileiras) que a propria ALEPI usa no site dela. Confirmada via

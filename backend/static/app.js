@@ -125,6 +125,76 @@ async function abrirDetalhe(sqCandidato) {
   }
 }
 
+function calcularIdade(dataNascimentoIso) {
+  if (!dataNascimentoIso) return null;
+  const nascimento = new Date(dataNascimentoIso);
+  if (isNaN(nascimento.getTime())) return null;
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - nascimento.getFullYear();
+  const aindaNaoFezAniversario =
+    hoje.getMonth() < nascimento.getMonth() ||
+    (hoje.getMonth() === nascimento.getMonth() && hoje.getDate() < nascimento.getDate());
+  if (aindaNaoFezAniversario) idade -= 1;
+  return idade;
+}
+
+function renderizarDetalhesTse(c) {
+  // So aparece se o script 12_baixar_tse_detalhes.py ja rodou pra esse
+  // candidato (senao esses campos nem existem no objeto retornado pela API).
+  if (!c.tse_divulga_url) return "";
+
+  const idade = calcularIdade(c.data_nascimento);
+  const linhasPessoais = [
+    c.grau_instrucao ? `<li><strong>Grau de instrução:</strong> ${c.grau_instrucao}</li>` : "",
+    c.ocupacao ? `<li><strong>Ocupação declarada:</strong> ${c.ocupacao}</li>` : "",
+    c.estado_civil ? `<li><strong>Estado civil:</strong> ${c.estado_civil}</li>` : "",
+    idade !== null ? `<li><strong>Idade:</strong> ${idade} anos</li>` : "",
+    c.bens_total ? `<li><strong>Bens declarados:</strong> ${formatarMoeda(c.bens_total)}</li>` : "",
+  ].filter(Boolean).join("");
+
+  const temPrestacaoContas = c.prestacao_total_recebido || c.prestacao_total_despesas_pagas;
+  const blocoPrestacaoContas = temPrestacaoContas
+    ? `
+      <h3>Prestação de contas de campanha</h3>
+      <ul>
+        ${c.prestacao_total_recebido ? `<li><strong>Total arrecadado:</strong> ${formatarMoeda(c.prestacao_total_recebido)}</li>` : ""}
+        ${c.prestacao_total_despesas_contratadas ? `<li><strong>Total de despesas contratadas:</strong> ${formatarMoeda(c.prestacao_total_despesas_contratadas)}</li>` : ""}
+        ${c.prestacao_total_despesas_pagas ? `<li><strong>Total de despesas pagas:</strong> ${formatarMoeda(c.prestacao_total_despesas_pagas)}</li>` : ""}
+      </ul>
+      ${c.prestacao_data_atualizacao ? `<p class="fonte">Dados de contas atualizados pelo TSE em ${c.prestacao_data_atualizacao}.</p>` : ""}
+    `
+    : `<p class="meta">Prestação de contas de campanha ainda não entregue ao TSE (ou ainda não processada).</p>`;
+
+  // O candidato preenche esse campo livremente no formulario do TSE -
+  // as vezes vem uma URL de verdade, as vezes um texto solto tipo
+  // "INSTAGRAM, YOUTUBE E X: @FULANO" (caso real ja visto). So' vira
+  // link clicavel quando parece mesmo uma URL (sem espaco, com um "."
+  // depois do host); senao mostra so' como texto.
+  const sites = (c.sites_tse || "").split("|").map((s) => s.trim()).filter(Boolean);
+  const pareceUrl = (s) => /^https?:\/\/[^\s]+\.[^\s]+$/i.test(s);
+  const blocoSites = sites.length
+    ? `
+      <h3>Sites e redes sociais informados ao TSE</h3>
+      <p class="meta">${sites.map((s) =>
+        pareceUrl(s)
+          ? `<a href="${s}" target="_blank" rel="noopener">${escaparHtml(s)}</a>`
+          : escaparHtml(s)
+      ).join("<br>")}</p>
+    `
+    : "";
+
+  return `
+    <div class="bloco">
+      <h2>Dados do candidato no TSE</h2>
+      ${linhasPessoais ? `<ul>${linhasPessoais}</ul>` : "<p class='meta'>Sem dados pessoais complementares disponíveis.</p>"}
+      ${blocoPrestacaoContas}
+      ${blocoSites}
+      <p><a class="link-pdf" href="${c.tse_divulga_url}" target="_blank" rel="noopener">Ver todos os dados oficiais no TSE &rarr;</a></p>
+      <p class="fonte">Fonte: TSE - Divulgação de Candidaturas e Contas Eleitorais.</p>
+    </div>
+  `;
+}
+
 function renderizarDetalhe(c) {
   const partes = [];
 
@@ -165,6 +235,8 @@ function renderizarDetalhe(c) {
         : ""}
     </div>
   `);
+
+  partes.push(renderizarDetalhesTse(c));
 
   // Ficha de gestor (se for incumbente)
   if (c.incumbente === "1") {

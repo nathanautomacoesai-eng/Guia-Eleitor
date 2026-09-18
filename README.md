@@ -27,6 +27,7 @@ em publicar o site na internet (não só rodar localmente).
 | Vereadores de Teresina em exercício, despesas, emendas | [Portal da Transparência da Câmara Municipal de Teresina](https://transparencia.teresina.pi.leg.br) | Alta (site oficial, sem API - coletado via automação de navegador) |
 | Governador titular: despesas, receitas, contratos, licitações, convênios | [Portal da Transparência do Piauí](https://transparencia.pi.gov.br) (API em `api.transparencia.pi.gov.br`, não documentada publicamente) | Alta (dado oficial do Executivo estadual) · ver "Ficha de gestão do Governador" |
 | Deputados estaduais em exercício (ALEPI) e suas emendas parlamentares estaduais | [Assembleia Legislativa do Piauí](https://sapl.al.pi.leg.br) (API do sistema SAPL) + [Portal da Transparência do Piauí](https://transparencia.pi.gov.br) (`/api/v1/emendas-estaduais/{ano}/`) | Alta (dado oficial), vínculo por nome (ALEPI não expõe CPF) |
+| Dados pessoais complementares (grau de instrução, ocupação, bens, sites/redes sociais informados) e resumo da prestação de contas de campanha, para todo candidato | [TSE - Divulgação de Candidaturas e Contas Eleitorais](https://divulgacandcontas.tse.jus.br/divulga/) (API oficial por trás da página pública) | Alta (dado oficial autodeclarado pelo candidato ao TSE) |
 
 ## Estrutura do projeto
 
@@ -45,6 +46,7 @@ Guia Eleitor/
     09_diagnostico_transparencia_pi.py  # script de diagnóstico da API do Piauí (não faz parte da pipeline)
     10_baixar_transparencia_pi.py  # ficha de gestão do Governador titular (despesas/receitas/contratos/licitações/convênios)
     11_baixar_alepi.py       # deputados estaduais em exercício (ALEPI) + emendas parlamentares estaduais
+    12_baixar_tse_detalhes.py # dados pessoais + prestação de contas de cada candidato, direto do TSE
     executar_tudo.py         # roda os passos em sequência
     db.py                    # conexão com o Postgres, compartilhada por scripts e backend
     storage.py               # upload de PDFs pro Supabase Storage (API REST)
@@ -195,9 +197,36 @@ de governador, atualize essa constante.
 
 O formato de todos os endpoints (inclusive o de agregação) foi
 confirmado manualmente abrindo o site e inspecionando as chamadas reais
-que ele faz, mas o script em si (`10_baixar_transparencia_pi.py`) ainda
-não foi rodado de ponta a ponta contra a API real. Rode e me avise se
-algum passo vier vazio ou der erro.
+que ele faz, e o script já foi rodado com sucesso contra a API real.
+
+## Dados complementares do TSE (candidatos sem proposta de governo)
+
+O TSE só exige "proposta de governo" (PDF) de candidatos a Governador -
+os outros 337 candidatos do recorte (Senador, Deputado Federal, Deputado
+Estadual) ficavam sem quase nenhuma informação além do cadastro básico.
+`scripts/12_baixar_tse_detalhes.py` busca, para cada candidato, direto
+da API oficial por trás da página pública do TSE
+(`divulgacandcontas.tse.jus.br`):
+
+- Grau de instrução, ocupação declarada, estado civil, idade e bens
+  declarados (valor total).
+- Resumo da prestação de contas de campanha (total arrecadado, total de
+  despesas contratadas/pagas), quando já entregue ao TSE.
+- Sites e redes sociais que o **próprio candidato** informou ao TSE no
+  registro da candidatura (quando existir) - dado oficial, não é
+  garimpado em buscador nenhum.
+- Um link direto pra página completa do candidato no site do TSE.
+
+Isso aparece pra todo candidato (não só quem não tem proposta), num
+bloco "Dados do candidato no TSE" na ficha dele. Como é uma chamada por
+candidato (348 no total, 2 chamadas cada), rodar esse script demora bem
+mais que os outros - é normal.
+
+**Atenção:** os sites/redes sociais vêm exatamente como o candidato
+preencheu no formulário do TSE (às vezes é um texto solto, tipo
+"INSTAGRAM: @fulano", em vez de uma URL de verdade) - o projeto exibe
+como link clicável quando parece uma URL válida, mas não valida nem
+verifica se o link realmente pertence ao candidato.
 
 ## Limitações conhecidas
 

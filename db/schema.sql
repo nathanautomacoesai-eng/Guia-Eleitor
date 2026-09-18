@@ -53,7 +53,24 @@ CREATE TABLE candidatos (
     parlamentar_id TEXT,
     parlamentar_origem TEXT,
     incumbente BOOLEAN DEFAULT FALSE,
-    vinculo_confianca TEXT
+    vinculo_confianca TEXT,
+
+    -- Dados complementares direto da API do TSE (DivulgaCandContas),
+    -- usados sobretudo pra dar algum contexto sobre candidatos que nao
+    -- tem proposta de governo em PDF (ver scripts/12_baixar_tse_detalhes.py)
+    grau_instrucao TEXT,
+    ocupacao TEXT,
+    estado_civil TEXT,
+    cor_raca TEXT,
+    data_nascimento TEXT,
+    foto_url TEXT,
+    sites_tse TEXT,               -- sites/redes sociais que o candidato informou ao TSE, separados por " | "
+    bens_total NUMERIC,
+    prestacao_total_recebido NUMERIC,
+    prestacao_total_despesas_contratadas NUMERIC,
+    prestacao_total_despesas_pagas NUMERIC,
+    prestacao_data_atualizacao TEXT,
+    tse_divulga_url TEXT          -- link publico da pagina do candidato no site do TSE
 );
 CREATE INDEX idx_candidatos_nome_urna ON candidatos (nome_urna);
 CREATE INDEX idx_candidatos_cargo ON candidatos (cargo);

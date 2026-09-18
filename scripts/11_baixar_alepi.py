@@ -131,7 +131,7 @@ def montar_parlamentares_alepi(ativos: list[dict]) -> pd.DataFrame:
             "uf": config.UF,
             "partido": "",  # preenchido depois, se aparecer nas emendas (baixar_emendas_estaduais)
             "email": p.get("email", "") or "",
-            "foto_url": p.get("fotografia") or "",
+            "foto_url": (p.get("fotografia") or "").replace("http://", "https://"),
         })
     return pd.DataFrame(linhas)
 

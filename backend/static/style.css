@@ -177,6 +177,16 @@ main {
   margin-bottom: 6px;
 }
 
+.foto-candidato {
+  display: block;
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  border: 1px solid var(--cor-borda);
+}
+
 .texto-proposta {
   white-space: pre-wrap;
   font-size: 0.9rem;
