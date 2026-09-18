@@ -47,6 +47,7 @@ async function buscar() {
   const termo = campoBusca.value.trim();
   const cargo = filtroCargo.value;
   areaDetalhe.hidden = true;
+  areaResultados.hidden = false;
   areaResultados.innerHTML = "";
 
   if (termo.length < 2) {
@@ -108,6 +109,7 @@ function renderizarResultados(resultados) {
 }
 
 async function abrirDetalhe(sqCandidato) {
+  areaResultados.hidden = true;
   areaDetalhe.hidden = false;
   areaDetalhe.innerHTML = "<p>Carregando...</p>";
   areaDetalhe.scrollIntoView({ behavior: "smooth" });
@@ -199,7 +201,7 @@ function renderizarDetalhe(c) {
   const partes = [];
 
   partes.push(`
-    <button class="botao-voltar" onclick="document.getElementById('detalhe').hidden = true;">
+    <button class="botao-voltar" onclick="voltarParaBusca();">
       &larr; Voltar para a busca
     </button>
     <div class="bloco">
@@ -480,6 +482,13 @@ function escaparHtml(texto) {
   const div = document.createElement("div");
   div.textContent = texto;
   return div.innerHTML;
+}
+
+function voltarParaBusca() {
+  areaDetalhe.hidden = true;
+  areaDetalhe.innerHTML = "";
+  areaResultados.hidden = false;
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 campoBusca.addEventListener("input", () => {
