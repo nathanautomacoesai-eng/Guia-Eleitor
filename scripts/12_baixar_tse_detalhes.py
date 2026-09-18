@@ -86,14 +86,17 @@ def _url_divulga(uf: str, sq_candidato: str, ano_eleicao: str) -> str:
 # entre Python e o navegador.
 JS_BUSCAR_CANDIDATO = """
 async ({ base, idEleicao, uf, ano, sqCandidato, codigoCargo }) => {
-  const resultado = { candidatura: null, prestador: null, erro: null };
+  const resultado = { candidatura: null, prestador: null, erro: null, statusCandidatura: null, statusPrestador: null };
   try {
     const rCand = await fetch(
       `${base}/divulga/rest/v1/candidatura/buscar/${ano}/${uf}/${idEleicao}/candidato/${sqCandidato}`,
       { headers: { Accept: "application/json" } }
     );
+    resultado.statusCandidatura = rCand.status;
     if (rCand.ok) {
       resultado.candidatura = await rCand.json();
+    } else {
+      resultado.erro = "candidatura HTTP " + rCand.status;
     }
   } catch (e) {
     resultado.erro = "candidatura: " + String(e);
@@ -110,6 +113,7 @@ async ({ base, idEleicao, uf, ano, sqCandidato, codigoCargo }) => {
         `${base}/divulga/rest/v1/prestador/consulta/${idEleicao}/${ano}/${uf}/${codigoCargo}/${nrPartido}/${numero}/${sqCandidato}`,
         { headers: { Accept: "application/json" } }
       );
+      resultado.statusPrestador = rPrest.status;
       if (rPrest.ok) {
         resultado.prestador = await rPrest.json();
       }
@@ -181,13 +185,29 @@ def main() -> None:
     erros = 0
 
     with sync_playwright() as p:
-        navegador = p.chromium.launch(headless=True)
+        # headless=False de proposito: Chrome headless se identifica como
+        # "HeadlessChrome" no user-agent, um sinal classico que a Akamai
+        # (protecao anti-bot na frente do site do TSE) bloqueia direto -
+        # foi essa a causa real do primeiro teste ter voltado tudo vazio.
+        # Uma janela do navegador vai abrir na tela enquanto este script
+        # roda; e' esperado, so' nao feche ela.
+        navegador = p.chromium.launch(headless=False)
         page = navegador.new_page()
+        # Mascara outro sinal comum de automacao que a Akamai tambem
+        # costuma checar (Playwright/Selenium deixam isso "true" por
+        # padrao; um navegador comum tem "undefined").
+        page.add_init_script(
+            "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"
+        )
         # Carrega a pagina uma vez so, pra abrir na mesma origem do site
         # (fetch de dentro da pagina evita qualquer questao de CORS e
         # passa pela protecao anti-bot igual um acesso humano normal).
-        page.goto(f"{SITE_BASE}/divulga/", timeout=60000)
-        page.wait_for_timeout(1500)
+        primeiro_sq = str(candidatos.iloc[0]["sq_candidato"])
+        primeiro_ano = candidatos.iloc[0].get("ano_eleicao") or str(config.ANO_ELEICAO)
+        url_inicial = _url_divulga(config.UF, primeiro_sq, primeiro_ano)
+        print(f"Abrindo {url_inicial} pra estabelecer sessao com o site antes de comecar...")
+        page.goto(url_inicial, timeout=60000)
+        page.wait_for_timeout(4000)
 
         for i, row in enumerate(candidatos.to_dict("records"), start=1):
             sq = row.get("sq_candidato", "")
@@ -215,6 +235,10 @@ def main() -> None:
                 print(f"  (aviso) falha no candidato {sq}: {exc}")
                 resultado = {}
                 erros += 1
+
+            if i <= 3 or resultado.get("erro"):
+                print(f"  [debug] candidato {sq}: status_candidatura={resultado.get('statusCandidatura')} "
+                      f"status_prestador={resultado.get('statusPrestador')} erro={resultado.get('erro')}")
 
             linhas.append(montar_linha(sq, ano, uf, resultado))
             page.wait_for_timeout(150)  # pausa curta entre chamadas, por educacao com o servidor
