@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+data/raw/
+data/processed/*.db
+data/processed/propostas_texto/
+venv/
+.venv/
+venvire/
+Claude outputs/

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guia Eleitor - Piauí 2026</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topo">
+    <h1>Guia Eleitor <span class="badge">Piauí 2026</span></h1>
+    <p class="subtitulo">
+      Consulta pública e não-partidária de propostas de governo e trajetória
+      de gestão dos candidatos. Dados oficiais: TSE, Câmara dos Deputados,
+      Senado Federal e Portal da Transparência.
+    </p>
+  </header>
+
+  <main>
+    <section class="busca">
+      <input
+        id="campo-busca"
+        type="text"
+        placeholder="Digite o nome do candidato (ex.: Fulano da Silva)"
+        autocomplete="off"
+      />
+      <select id="filtro-cargo">
+        <option value="">Todos os cargos</option>
+        <option value="GOVERNADOR">Governador</option>
+        <option value="SENADOR">Senador</option>
+        <option value="DEPUTADO FEDERAL">Deputado Federal</option>
+        <option value="DEPUTADO ESTADUAL">Deputado Estadual</option>
+      </select>
+    </section>
+
+    <section id="mensagem" class="mensagem" hidden></section>
+
+    <section id="resultados" class="resultados"></section>
+
+    <section id="detalhe" class="detalhe" hidden></section>
+  </main>
+
+  <footer>
+    <p>
+      Projeto independente de informação eleitoral. Não representa
+      posicionamento a favor ou contra nenhum candidato ou partido. Todo o
+      conteúdo exibido é reproduzido de fontes oficiais, com a fonte
+      indicada em cada seção.
+    </p>
+    <p class="creditos">
+      Desenvolvido por <strong>Nathanael Augusto</strong> · sistemas web sob encomenda ·
+      <a href="https://wa.me/5586988523363" target="_blank" rel="noopener">WhatsApp</a> ·
+      <a href="https://instagram.com/nathanael.augusto.22" target="_blank" rel="noopener">Instagram</a> ·
+      <a href="mailto:nathanautomacoesai@gmail.com">E-mail</a>
+    </p>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
